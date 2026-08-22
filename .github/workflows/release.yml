@@ -40,7 +40,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          commit="$(git rev-parse "${COMMIT}")"
+          commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${COMMIT}" --jq .sha)"
           run_id="$(gh run list \
             --repo "${GITHUB_REPOSITORY}" \
             --workflow=ci.yml \
