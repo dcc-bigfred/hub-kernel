@@ -1,0 +1,54 @@
+# Tag v* → GitHub Release with packed kernel + sha256.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: GitHub Release
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download kernel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bigfred-kernel-rpi5
+          path: dist
+
+      - name: Create release and upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          tar="$(ls dist/bigfred-kernel-rpi5-${TAG}.tar.xz)"
+          sum="${tar}.sha256"
+          test -f "${tar}"
+          test -f "${sum}"
+          if ! gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release create "${TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "${TAG}" \
+              --generate-notes \
+              "${tar}" "${sum}"
+          else
+            echo "Release ${TAG} exists; uploading assets"
+            gh release upload "${TAG}" --repo "${GITHUB_REPOSITORY}" \
+              "${tar}" "${sum}" --clobber
+          fi

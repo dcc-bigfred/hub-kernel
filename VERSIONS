@@ -1,0 +1,9 @@
+# raspberrypi/linux pin. Override without editing:
+#   make package LINUX_COMMIT=…
+#
+LINUX_REPO ?= raspberrypi/linux
+LINUX_BRANCH ?= rpi-6.18.y
+LINUX_COMMIT ?= 65495647821026e14223095d1b0124aa3d502dec
+LINUX_DEFCONFIG ?= bcm2712
+LINUX_ARCH ?= arm64
+CROSS_COMPILE ?= aarch64-linux-gnu-

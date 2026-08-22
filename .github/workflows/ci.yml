@@ -1,0 +1,78 @@
+# Fast checks on every PR; full kernel build on main / dispatch / called from release.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: make check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sanity
+        run: make check
+
+  build:
+    name: kernel package
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross toolchain
+        run: sudo bash scripts/install-deps.sh
+
+      - name: ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('VERSIONS', 'configs/**') }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
+
+      - name: Version label
+        id: ver
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "version=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "version=g$(git rev-parse --short HEAD)" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Build and pack
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: make package
+
+      - name: ccache stats
+        if: always()
+        run: ccache -s || true
+
+      - name: Upload tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: bigfred-kernel-rpi5
+          path: |
+            dist/bigfred-kernel-rpi5-*.tar.xz
+            dist/bigfred-kernel-rpi5-*.tar.xz.sha256
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,13 @@
+/dl/
+/build/
+/staging/
+/dist/
+/.ccache/
+*.tar.gz
+*.tar.xz
+*.sha256
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
