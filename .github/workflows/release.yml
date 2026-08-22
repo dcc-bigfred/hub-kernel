@@ -6,9 +6,17 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (e.g. v6.18.0-r1)
+        required: true
+      commit:
+        description: Commit with a successful main CI artifact (default = tag target / HEAD)
+        required: false
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -20,6 +28,9 @@ jobs:
     name: GitHub Release
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      COMMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.commit || github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,7 +40,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          commit="${GITHUB_SHA}"
+          commit="${COMMIT}"
           run_id="$(gh run list \
             --repo "${GITHUB_REPOSITORY}" \
             --workflow=ci.yml \
@@ -60,19 +71,16 @@ jobs:
           ls -la dist/
 
       - name: Relabel tarball for release tag
-        env:
-          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           src="$(ls dist/bigfred-kernel-rpi5-*.tar.xz | head -1)"
-          rm -f dist/bigfred-kernel-rpi5-"${TAG}".tar.xz dist/bigfred-kernel-rpi5-"${TAG}".tar.xz.sha256
+          rm -f "dist/bigfred-kernel-rpi5-${TAG}.tar.xz" "dist/bigfred-kernel-rpi5-${TAG}.tar.xz.sha256"
           bash scripts/relabel-release.sh "${src}" "${TAG}" dist
           rm -f "${src}" "${src}.sha256" 2>/dev/null || true
 
       - name: Create release and upload
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           tar="dist/bigfred-kernel-rpi5-${TAG}.tar.xz"
