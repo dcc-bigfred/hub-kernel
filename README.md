@@ -39,6 +39,10 @@ matching `.sha256`. Untagged builds use `g<shortsha>` as the version.
 
    Tagging before CI succeeds will fail with “no successful CI run on main”.
 
+   To republish without moving a tag (e.g. after a workflow fix), use **Actions →
+   Release → Run workflow** with `tag` and optional `commit` (short or full SHA of
+   the green main CI run).
+
 ## Artifact layout
 
 ```
