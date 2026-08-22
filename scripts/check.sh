@@ -34,7 +34,7 @@ if [[ "${LINUX_DEFCONFIG}" != "bcm2712" ]]; then
 	err=1
 fi
 
-for s in fetch-src.sh build.sh package.sh check.sh install-deps.sh lib.sh; do
+for s in fetch-src.sh build.sh package.sh relabel-release.sh check.sh install-deps.sh lib.sh; do
 	bash -n "${ROOT}/scripts/${s}"
 done
 

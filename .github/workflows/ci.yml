@@ -1,4 +1,4 @@
-# Fast checks on every PR; full kernel build on main / dispatch / called from release.
+# Fast checks on every PR; full kernel build on main (release tags reuse this artifact).
 
 name: CI
 
@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-  workflow_call:
   workflow_dispatch:
 
 concurrency:
@@ -48,20 +47,10 @@ jobs:
           restore-keys: |
             ccache-${{ runner.os }}-
 
-      - name: Version label
-        id: ver
-        run: |
-          set -euo pipefail
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            echo "version=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
-          else
-            echo "version=g$(git rev-parse --short HEAD)" >> "${GITHUB_OUTPUT}"
-          fi
-
       - name: Build and pack
-        env:
-          VERSION: ${{ steps.ver.outputs.version }}
-        run: make package
+        run: |
+          export VERSION="g$(git rev-parse --short HEAD)"
+          make package
 
       - name: ccache stats
         if: always()

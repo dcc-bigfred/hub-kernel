@@ -1,4 +1,4 @@
-# Tag v* → GitHub Release with packed kernel + sha256.
+# Tag v* → GitHub Release from the CI artifact built on main (no rebuild).
 
 name: Release
 
@@ -11,25 +11,63 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-jobs:
-  ci:
-    permissions:
-      contents: read
-    uses: ./.github/workflows/ci.yml
+permissions:
+  contents: write
+  actions: read
 
+jobs:
   publish:
     name: GitHub Release
-    needs: ci
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    permissions:
-      contents: write
     steps:
-      - name: Download kernel artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: bigfred-kernel-rpi5
-          path: dist
+      - uses: actions/checkout@v4
+
+      - name: Resolve successful main CI run for this commit
+        id: ci_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          commit="${GITHUB_SHA}"
+          run_id="$(gh run list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --workflow=ci.yml \
+            --branch=main \
+            --commit="${commit}" \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId')"
+          if [[ -z "${run_id}" || "${run_id}" == "null" ]]; then
+            echo "error: no successful CI run on main for commit ${commit}" >&2
+            echo "Push to main and wait for CI before tagging." >&2
+            exit 1
+          fi
+          echo "Using CI run ${run_id} (commit ${commit})"
+          echo "run_id=${run_id}" >> "${GITHUB_OUTPUT}"
+
+      - name: Download kernel artifact from CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download "${{ steps.ci_run.outputs.run_id }}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            -n bigfred-kernel-rpi5 \
+            -D dist
+          ls -la dist/
+
+      - name: Relabel tarball for release tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          src="$(ls dist/bigfred-kernel-rpi5-*.tar.xz | head -1)"
+          rm -f dist/bigfred-kernel-rpi5-"${TAG}".tar.xz dist/bigfred-kernel-rpi5-"${TAG}".tar.xz.sha256
+          bash scripts/relabel-release.sh "${src}" "${TAG}" dist
+          rm -f "${src}" "${src}.sha256" 2>/dev/null || true
 
       - name: Create release and upload
         env:
@@ -37,7 +75,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          tar="$(ls dist/bigfred-kernel-rpi5-${TAG}.tar.xz)"
+          tar="dist/bigfred-kernel-rpi5-${TAG}.tar.xz"
           sum="${tar}.sha256"
           test -f "${tar}"
           test -f "${sum}"

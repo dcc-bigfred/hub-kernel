@@ -29,12 +29,15 @@ matching `.sha256`. Untagged builds use `g<shortsha>` as the version.
 1. Bump `LINUX_COMMIT` in `VERSIONS` and the SHA in `configs/linux.hash` if
    moving the upstream pin (recompute with `sha256sum dl/linux-<commit>.tar.gz`).
 2. Change fragments under `configs/` for hub `CONFIG_*` options.
-3. Tag `v6.18.0-rN` (upstream version + rebuild counter). Same Linux commit
-   with a fragment change is `-rN+1`.
-4. Push the tag. `release.yml` attaches:
+3. Merge to `main` and wait for **CI** to finish (kernel build + artifact upload).
+4. Tag `v6.18.0-rN` on that commit and push. `release.yml` **does not rebuild**;
+   it downloads the CI artifact from the matching `main` run, relabels it, and
+   publishes:
 
    - `bigfred-kernel-rpi5-v6.18.0-rN.tar.xz`
    - `bigfred-kernel-rpi5-v6.18.0-rN.tar.xz.sha256`
+
+   Tagging before CI succeeds will fail with “no successful CI run on main”.
 
 ## Artifact layout
 
