@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 10
     env:
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-      COMMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.commit || github.sha }}
+      COMMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.commit != '' && inputs.commit || github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +40,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          commit="${COMMIT}"
+          commit="$(git rev-parse "${COMMIT}")"
           run_id="$(gh run list \
             --repo "${GITHUB_REPOSITORY}" \
             --workflow=ci.yml \
