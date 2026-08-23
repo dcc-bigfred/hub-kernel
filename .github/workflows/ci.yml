@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ccache-${{ runner.os }}-${{ hashFiles('VERSIONS', 'configs/**') }}
+          key: ccache-${{ runner.os }}-${{ hashFiles('VERSIONS', 'configs/**', 'patches/**') }}
           restore-keys: |
             ccache-${{ runner.os }}-
 

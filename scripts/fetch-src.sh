@@ -47,3 +47,4 @@ if [[ ! -f "${src}/Makefile" ]]; then
 fi
 
 echo "Source ready: ${src}"
+bash "${ROOT}/scripts/apply-patches.sh"

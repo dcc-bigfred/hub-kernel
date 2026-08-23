@@ -21,7 +21,9 @@ need "${ROOT}/configs/linux.hash"
 need "${ROOT}/VERSIONS"
 need "${ROOT}/scripts/fetch-src.sh"
 need "${ROOT}/scripts/build.sh"
+need "${ROOT}/scripts/apply-patches.sh"
 need "${ROOT}/scripts/package.sh"
+need "${ROOT}/patches/linux"
 
 tar_name="linux-${LINUX_COMMIT}.tar.gz"
 if ! grep -qE "^sha256[[:space:]]+[0-9a-f]{64}[[:space:]]+${tar_name}\$" "${ROOT}/configs/linux.hash"; then
@@ -34,8 +36,26 @@ if [[ "${LINUX_DEFCONFIG}" != "bcm2712" ]]; then
 	err=1
 fi
 
-for s in fetch-src.sh build.sh package.sh relabel-release.sh check.sh install-deps.sh lib.sh; do
+for s in fetch-src.sh build.sh apply-patches.sh package.sh relabel-release.sh check.sh install-deps.sh lib.sh; do
 	bash -n "${ROOT}/scripts/${s}"
+done
+
+shopt -s nullglob
+patches=("${ROOT}/patches/linux"/*.patch)
+shopt -u nullglob
+if [[ ${#patches[@]} -eq 0 ]]; then
+	echo "error: no patches in patches/linux/" >&2
+	err=1
+fi
+for p in "${patches[@]}"; do
+	if ! grep -qE '^From:' "${p}"; then
+		echo "error: ${p} missing From: header" >&2
+		err=1
+	fi
+	if ! grep -qE '^Subject:' "${p}"; then
+		echo "error: ${p} missing Subject: header" >&2
+		err=1
+	fi
 done
 
 if [[ "${err}" -ne 0 ]]; then

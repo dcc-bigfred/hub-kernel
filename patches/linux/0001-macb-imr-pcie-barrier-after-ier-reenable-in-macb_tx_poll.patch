@@ -1,0 +1,29 @@
+From: BigFred hub-kernel <noreply@dcc-bigfred>
+Subject: [PATCH 1/2] net: macb: IMR PCIe barrier after IER re-enable in macb_tx_poll
+
+PR raspberrypi/linux#7340 patch 2 used a destructive ISR read after
+re-enabling TCOMP. RP1 GEM is clear-on-read, so that consumed TCOMP.
+raspberrypi/linux#7472 dropped it for that reason.
+
+Keep the PCIe read barrier from #7369: IMR is the read-only mask
+mirror, no side effects. Combined with the posted-write NCR flush
+already in this pin (MACB_CAPS_PCIE_POSTED_WRITES on raspberrypi,rp1-gem),
+macb_tx_complete_pending() can observe flushed TX_USED DMA.
+
+Not-upstream: #7472 remains the last word on rpi-6.18.y.
+
+--- a/drivers/net/ethernet/cadence/macb_main.c
++++ b/drivers/net/ethernet/cadence/macb_main.c
+@@ -2010,6 +2010,12 @@
+ 		 * actions if an interrupt is raised just after enabling them,
+ 		 * but this should be harmless.
+ 		 */
++		/* IMR is the read-only mask mirror: no side effects on
++		 * clear-on-read or W1C ISR silicon.  The MMIO read is a
++		 * PCIe barrier so macb_tx_complete_pending() sees flushed
++		 * TX_USED DMA writes after TCOMP was masked.
++		 */
++		(void)queue_readl(queue, IMR);
+ 		if (macb_tx_complete_pending(queue)) {
+ 			queue_writel(queue, IDR, MACB_BIT(TCOMP));
+ 			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
