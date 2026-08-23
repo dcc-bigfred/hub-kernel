@@ -9,7 +9,8 @@ Buildroot.
 The scripts in this repo are MIT. **The kernel binary and modules are GPLv2**
 (`raspberrypi/linux`).
 
-Target is **Pi 5 / BCM2712 only**. Pi 3 needs a separate defconfig and artifact.
+Target is **Pi 5 / BCM2712 only**. Pi 3 (64-bit `kernel8`) is
+[hub-kernel-rpi3](https://github.com/dcc-bigfred/hub-kernel-rpi3).
 
 ## Build
 
