@@ -8,6 +8,9 @@ the ring is non-empty and tx_tail has not advanced.
 
 Boot false-positive: tx_stall_tail_moved starts true in macb_open().
 
+Log with net_ratelimit()+netdev_warn: this pin has no netdev_warn_ratelimited
+(Werror=implicit-function-declaration).
+
 Not-upstream: carry until rpi-6.18.y grows an equivalent.
 
 --- a/drivers/net/ethernet/cadence/macb_main.c
@@ -21,7 +24,7 @@ Not-upstream: carry until rpi-6.18.y grows an equivalent.
  	if (__netif_subqueue_stopped(bp->dev, queue_index) &&
  	    CIRC_CNT(queue->tx_head, queue->tx_tail,
  		     bp->tx_ring_size) <= MACB_TX_WAKEUP_THRESH(bp))
-@@ -2028,6 +2030,49 @@
+@@ -2028,6 +2030,50 @@
  	return work_done;
  }
  
@@ -57,10 +60,11 @@ Not-upstream: carry until rpi-6.18.y grows an equivalent.
 +	spin_unlock_irqrestore(&queue->tx_ptr_lock, flags);
 +
 +	if (stalled) {
-+		netdev_warn_ratelimited(bp->dev,
-+					"TX stall detected on queue %u (tail=%u head=%u); re-kicking TSTART\n",
-+					(unsigned int)(queue - bp->queues),
-+					cur_tail, cur_head);
++		if (net_ratelimit())
++			netdev_warn(bp->dev,
++				    "TX stall detected on queue %u (tail=%u head=%u); re-kicking TSTART\n",
++				    (unsigned int)(queue - bp->queues),
++				    cur_tail, cur_head);
 +		macb_tx_restart(queue);
 +	}
 +
@@ -71,7 +75,7 @@ Not-upstream: carry until rpi-6.18.y grows an equivalent.
  static void macb_hresp_error_task(struct work_struct *work)
  {
  	struct macb *bp = from_work(bp, work, hresp_err_bh_work);
-@@ -3313,6 +3358,9 @@
+@@ -3313,6 +3359,9 @@
  	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
  		napi_enable(&queue->napi_rx);
  		napi_enable(&queue->napi_tx);
@@ -81,7 +85,7 @@ Not-upstream: carry until rpi-6.18.y grows an equivalent.
  	}
  
  	macb_init_hw(bp);
-@@ -3359,6 +3407,7 @@
+@@ -3359,6 +3408,7 @@
  	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
  		napi_disable(&queue->napi_rx);
  		napi_disable(&queue->napi_tx);
@@ -89,7 +93,7 @@ Not-upstream: carry until rpi-6.18.y grows an equivalent.
  		netdev_tx_reset_queue(netdev_get_tx_queue(dev, q));
  	}
  
-@@ -4965,6 +5014,8 @@
+@@ -4965,6 +5015,8 @@
  		}
  
  		INIT_WORK(&queue->tx_error_task, macb_tx_error_task);
