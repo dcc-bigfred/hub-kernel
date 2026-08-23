@@ -1,4 +1,8 @@
 # Fast checks on every PR; full kernel build on main (release tags reuse this artifact).
+#
+# When main is building commit SHA X, in-progress CI on a feature branch for
+# the same SHA is cancelled (duplicate kernel package). Main never cancels
+# itself.
 
 name: CI
 
@@ -11,14 +15,49 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Do not cancel an in-flight main kernel build when a later (e.g. yaml-only)
+  # push lands; the gate job cancels *feature-branch* duplicates instead.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
+  gate:
+    name: cancel duplicate feature builds
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Cancel feature-branch CI for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha="${GITHUB_SHA}"
+          echo "Looking for non-main CI runs of commit ${sha}"
+          ids="$(gh run list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --workflow=ci.yml \
+            --commit="${sha}" \
+            --limit=50 \
+            --json databaseId,status,headBranch \
+            --jq ".[] | select(.headBranch != \"main\") | select(.databaseId != ${GITHUB_RUN_ID}) | select(.status == \"in_progress\" or .status == \"queued\" or .status == \"pending\") | .databaseId")"
+          if [[ -z "${ids}" ]]; then
+            echo "No duplicate feature-branch runs for ${sha}."
+            exit 0
+          fi
+          while read -r id; do
+            [[ -z "${id}" ]] && continue
+            echo "Cancelling feature-branch run ${id} (same commit as main)"
+            gh run cancel "${id}" --repo "${GITHUB_REPOSITORY}"
+          done <<< "${ids}"
+
   check:
     name: make check
+    needs: gate
+    if: always() && (needs.gate.result == 'success' || needs.gate.result == 'skipped')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -28,7 +67,8 @@ jobs:
 
   build:
     name: kernel package
-    needs: check
+    needs: [gate, check]
+    if: always() && !cancelled() && needs.check.result == 'success' && (needs.gate.result == 'success' || needs.gate.result == 'skipped')
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
