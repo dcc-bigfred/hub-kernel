@@ -24,11 +24,33 @@ make package
 `make package` writes `dist/bigfred-kernel-rpi5-<version>.tar.xz` and a
 matching `.sha256`. Untagged builds use `g<shortsha>` as the version.
 
+## Patches
+
+`patches/linux/*.patch` are applied with `patch -p1` after extract (see
+`scripts/apply-patches.sh`). The tree is a tarball, not a git checkout, so
+`git am` is not used.
+
+Current carry (macb / Cadence GEM on RP1):
+
+1. `0001-…` — IMR MMIO read after re-enabling TCOMP (`macb_tx_poll`). PCIe
+   read barrier without consuming ISR bits. raspberrypi/linux#7340 used a
+   destructive ISR read; #7472 dropped it because RP1 GEM is clear-on-read.
+2. `0002-…` — 1 s TX-stall `delayed_work` calling `macb_tx_restart()`.
+   Recovers a silent TX hang in ~1 s instead of the 5 s netdev watchdog.
+   Restores #7340 patch 3, which #7472 also dropped.
+
+The NCR posted-write flush from #7340 patch 1 is already in this pin
+(`MACB_CAPS_PCIE_POSTED_WRITES` on `raspberrypi,rp1-gem`).
+
+When bumping `LINUX_COMMIT`, re-apply the series on the new tree. If
+upstream restores an equivalent fix, delete the local patches.
+
 ## Release
 
 1. Bump `LINUX_COMMIT` in `VERSIONS` and the SHA in `configs/linux.hash` if
    moving the upstream pin (recompute with `sha256sum dl/linux-<commit>.tar.gz`).
-2. Change fragments under `configs/` for hub `CONFIG_*` options.
+2. Change fragments under `configs/` for hub `CONFIG_*` options, or add
+   patches under `patches/linux/`.
 3. Merge to `main` and wait for **CI** to finish (kernel build + artifact upload).
 4. Tag `v6.18.0-rN` on that commit and push. `release.yml` **does not rebuild**;
    it downloads the CI artifact from the matching `main` run, relabels it, and

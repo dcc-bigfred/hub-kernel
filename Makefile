@@ -14,7 +14,7 @@ help:
 	@echo "hub-kernel — Raspberry Pi 5 (bcm2712) kernel for BigFred"
 	@echo ""
 	@echo "  make check      — pin/hash/layout sanity"
-	@echo "  make fetch-src  — download raspberrypi/linux @ $(LINUX_COMMIT)"
+	@echo "  make fetch-src  — download raspberrypi/linux @ $(LINUX_COMMIT) + apply patches"
 	@echo "  make build      — Image + dtbs + modules"
 	@echo "  make package    — dist/bigfred-kernel-rpi5-<version>.tar.xz"
 	@echo "  make clean      — remove build/, staging/, dist/ (keeps dl/)"

@@ -21,6 +21,8 @@ if [[ "${MAKEFLAGS:-}" != *j* ]]; then
 	jflag=(-j"$(nproc 2>/dev/null || echo 4)")
 fi
 
+bash "${ROOT}/scripts/apply-patches.sh"
+
 cd "${LINUX_SRC}"
 
 echo "Configuring ${LINUX_DEFCONFIG} + hub fragments"
